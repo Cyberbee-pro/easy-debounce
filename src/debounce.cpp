@@ -1,10 +1,8 @@
 #include <Arduino.h>
-#include <debounce.h>
+#include "debounce.h"
 
-
-
-debounce::debounce(BleMouse *target_mouse, uint8_t pin, byte butt_args):wait_time(80)
-{
+debounce::debounce(BleMouse *target_mouse, uint8_t pin, byte butt_args)
+    : wait_time(80), debounce_timer(50) {
     this->pin = pin;
     this->target_mouse = target_mouse;
     this->target_keyboard = nullptr;
@@ -13,8 +11,8 @@ debounce::debounce(BleMouse *target_mouse, uint8_t pin, byte butt_args):wait_tim
     this->Tracking_Status = false;
 }
 
-debounce::debounce(BleKeyboard *target_keyboard, uint8_t pin, byte butt_args):wait_time(80)
-{
+debounce::debounce(BleKeyboard *target_keyboard, uint8_t pin, byte butt_args)
+    : wait_time(80), debounce_timer(50) {
     this->pin = pin;
     this->target_mouse = nullptr;
     this->target_keyboard = target_keyboard;
@@ -23,151 +21,54 @@ debounce::debounce(BleKeyboard *target_keyboard, uint8_t pin, byte butt_args):wa
     this->Tracking_Status = false;
 }
 
-
-void debounce::trigger_action()
-{
-
-    if (!Tracking_Status && digitalRead(pin) == LOW)
-    {
+void debounce::trigger_action() {
+    // State 1: Initial press detected (active-low) -> trigger click and start 50ms debounce filter
+    if (!Tracking_Status && digitalRead(pin) == LOW) {
         Tracking_Status = true;
         hold_Engaged = false;
-        wait_time.start();
+        debounce_timer.start();
 
-
-            if (nullptr != target_mouse)
-            {
-                target_mouse->click(butt_args);
-            }
-            else if (nullptr != target_keyboard)
-            {
-                target_keyboard->write(butt_args);
-            }
-            Serial.println("Button Clicked");
-        delay(125);
-        // if(!wait_time_small.is_Time_Enlapsed()){
-        //     return;
-        // }
-    }
-    else if ( wait_time.is_Time_Enlapsed() && digitalRead(pin) == LOW && Tracking_Status && !hold_Engaged)
-    {
-        if (nullptr != target_mouse)
-        {
-            target_mouse->press(butt_args);
+        if (nullptr != target_mouse) {
+            target_mouse->click(butt_args);
+        } else if (nullptr != target_keyboard) {
+            target_keyboard->write(butt_args);
         }
-        else if (nullptr != target_keyboard)
-        {
+    }
+    // State 2: Debounce window elapsed -> hand off to 80ms hold-threshold timer
+    else if (Tracking_Status && debounce_timer.GetIsActive()) {
+        if (debounce_timer.is_Time_Enlapsed()) {
+            debounce_timer.stop();
+            wait_time.start();
+        }
+    }
+    // State 3: Held past threshold -> transition to continuous press state
+    else if (wait_time.is_Time_Enlapsed() && digitalRead(pin) == LOW && Tracking_Status && !hold_Engaged) {
+        wait_time.stop();
+
+        if (nullptr != target_mouse) {
+            target_mouse->press(butt_args);
+        } else if (nullptr != target_keyboard) {
             target_keyboard->press(butt_args);
         }
 
-        Serial.println("Button Pressed");
-            hold_Engaged = true;
+        hold_Engaged = true;
     }
-    else if (digitalRead(pin) == HIGH && Tracking_Status)
-    {
+    // State 4: Button released -> reset state and release HID key/button
+    else if (digitalRead(pin) == HIGH && Tracking_Status) {
+        debounce_timer.stop();
+        wait_time.stop();
 
-        if (nullptr != target_mouse)
-        {
+        if (nullptr != target_mouse) {
             target_mouse->release(butt_args);
-        }
-        else if (nullptr != target_keyboard)
-        {
+        } else if (nullptr != target_keyboard) {
             target_keyboard->release(butt_args);
         }
+
         Tracking_Status = false;
         hold_Engaged = false;
-        // Serial.println("Button Released");
     }
 }
 
-
-
-
-void debounce::run_process()
-{
+void debounce::run_process() {
     trigger_action();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// GARBAGE EWW
-
-
-
-// void debounce::trigger_action()
-// {
-
-//     if (!Tracking_Status && digitalRead(pin) == LOW)
-//     {
-//         Tracking_Status = true;
-//         hold_Engaged = false;
-//         Tracking_Start = millis();
-
-//             if (type == Mouse)
-//             {
-//                 bleMouse.click(butt_args);
-//             }
-//             else if (type == Keyboard)
-//             {
-//                 bleKeyboard.write(butt_args);
-//             }
-//             Serial.println("Button Clicked");
-//         delay(90);
-//     }
-//     else if (millis() - Tracking_Start > 200 && digitalRead(pin) == LOW && Tracking_Status)
-//     {
-//         if (type == Mouse)
-//         {
-//             bleMouse.press(butt_args);
-//         }
-//         else if (type == Keyboard)
-//         {
-//             bleKeyboard.press(butt_args);
-//         }
-
-//         Serial.println("Button Pressed");
-//         if (!hold_Engaged)
-//         {
-//             hold_Engaged = true;
-//         }
-//     }
-//     else if (digitalRead(pin) == HIGH)
-//     {
-
-//         if (type == Mouse)
-//         {
-//             bleMouse.release(butt_args);
-//         }
-//         else if (type == Keyboard)
-//         {
-//             bleKeyboard.release(butt_args);
-//         }
-//         Tracking_Status = false;
-//         hold_Engaged = false;
-//         // Serial.println("Button Released");
-//     }
-// }
-
