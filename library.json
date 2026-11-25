@@ -1,6 +1,6 @@
 {
   "name": "easy_debounce",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Non-blocking click and hold button debounce library for ESP32 BLE Mouse and BLE Keyboard.",
   "keywords": ["debounce", "ble", "hid", "esp32", "button", "macro"],
   "repository": {
